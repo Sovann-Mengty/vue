@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fake Store</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="bg-gray-100">
+
+<div id="app" class="max-w-6xl mx-auto p-4">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-blue-700">🛍️ Fake Store</h1>
+    <div class="flex items-center gap-2">
+      <input v-model="search" type="text" placeholder="Search products..." class="px-3 py-2 border rounded-md shadow-sm" />
+      <button @click="showCart" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Cart ({{ totalQty }})
+      </button>
+    </div>
+  </div>
+
+  <!-- Product Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div v-for="product in filteredProducts" :key="product.id" class="bg-white shadow rounded-xl p-4 flex flex-col justify-between hover:shadow-md transition">
+  <img :src="product.image" alt="Product" class="h-48 object-contain mb-3" />
+
+  <div class="flex-1">
+    <h2 class="font-semibold text-base mb-1 truncate">{{ product.title }}</h2>
+    <p class="text-gray-500 text-sm line-clamp-2 mb-3">{{ product.description }}</p>
+  </div>
+
+  <div class="flex justify-between items-center mt-2">
+    <p class="font-bold text-green-600 text-base">${{ product.price }}</p>
+    <button
+      @click="addToCart(product)"
+      class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"
+    >
+      Add to Cart
+    </button>
+  </div>
+</div>
+
+  </div>
+
+  <!-- Cart Modal -->
+  <div v-if="isCartOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <button @click="isCartOpen = false" class="absolute top-3 right-4 text-gray-500 hover:text-red-500 text-xl font-bold">&times;</button>
+      <h2 class="text-2xl font-bold text-blue-700 mb-4">🛒 Your Cart</h2>
+
+      <table class="w-full text-sm border-t border-b">
+        <thead>
+          <tr class="text-left text-gray-600 border-b">
+            <th class="py-2">Product</th>
+            <th class="text-center">Qty</th>
+            <th class="text-center">Price</th>
+            <th class="text-center">Total</th>
+            <th class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in cart" :key="item.id" class="border-b hover:bg-gray-50">
+            <td class="py-2 pr-2">{{ item.title }}</td>
+            <td class="text-center">
+              <div class="flex justify-center items-center gap-2">
+                <button @click="removeQty(item.id)" class="px-2 py-1 bg-gray-200 rounded hover:bg-red-200">−</button>
+                {{ item.qty }}
+                <button @click="addQty(item.id)" class="px-2 py-1 bg-gray-200 rounded hover:bg-green-200">+</button>
+              </div>
+            </td>
+            <td class="text-center">${{ item.price }}</td>
+            <td class="text-center">${{ (item.price * item.qty).toFixed(2) }}</td>
+            <td class="text-center">
+              <button @click="deleteItem(item.id)" class="text-red-500 hover:text-red-700">🗑️</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="mt-4 text-right font-semibold text-lg text-blue-700">
+        Grand Total: ${{ grandTotal }}
+      </div>
+
+      <div class="mt-6 text-right">
+        <button @click="checkout" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+          💳 Pay Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+
+createApp({
+  setup() {
+    const products = ref([]);
+    const cart = ref([]);
+    const search = ref("");
+    const isCartOpen = ref(false);
+
+    const fetchProducts = async () => {
+      const res = await fetch("https://fakestoreapi.com/products");
+      products.value = await res.json();
+    };
+
+    const addToCart = (product) => {
+  const existing = cart.value.find(p => p.id === product.id);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    cart.value.push({ ...product, qty: 1 });
+  }
+
+  Swal.fire({
+    icon: 'success',
+    title: 'Added to Cart',
+    text: `"${product.title}" has been added!`,
+    timer: 1200,
+    showConfirmButton: false,
+    toast: true,
+    position: 'top-end',
+    background: '#ecfdf5',
+    color: '#059669'
+  });
+};
+
+
+    const removeQty = (id) => {
+      const item = cart.value.find(p => p.id === id);
+      if (item && item.qty > 1) {
+        item.qty--;
+      } else {
+        deleteItem(id);
+      }
+    };
+
+    const addQty = (id) => {
+      const item = cart.value.find(p => p.id === id);
+      if (item) item.qty++;
+    };
+
+    const deleteItem = (id) => {
+      cart.value = cart.value.filter(p => p.id !== id);
+    };
+
+    const grandTotal = computed(() =>
+      cart.value.reduce((sum, item) => sum + item.price * item.qty, 0).toFixed(2)
+    );
+
+    const totalQty = computed(() =>
+      cart.value.reduce((sum, item) => sum + item.qty, 0)
+    );
+
+    const filteredProducts = computed(() =>
+      products.value.filter(p =>
+        p.title.toLowerCase().includes(search.value.toLowerCase())
+      )
+    );
+
+    const showCart = () => {
+      if (cart.value.length === 0) {
+        Swal.fire("Cart is empty!", "", "info");
+        return;
+      }
+      isCartOpen.value = true;
+    };
+
+    const checkout = () => {
+      Swal.fire({
+        icon: 'success',
+        title: '✅ Payment Successful',
+        text: 'Thank you for your purchase!',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      cart.value = [];
+      isCartOpen.value = false;
+    };
+
+    onMounted(fetchProducts);
+
+    return {
+      products,
+      cart,
+      search,
+      addToCart,
+      showCart,
+      addQty,
+      removeQty,
+      deleteItem,
+      grandTotal,
+      totalQty,
+      filteredProducts,
+      isCartOpen,
+      checkout
+    };
+  }
+}).mount("#app");
+</script>
+
+<footer class="mt-12 bg-white border-t py-6 text-center text-sm text-gray-600">
+  <p>&copy; 2025 Fake Store. Built with 💙 Vue & TailwindCSS.</p>
+  <p class="mt-2">
+    <a href="#" class="text-blue-600 hover:underline">Privacy Policy</a> · 
+    <a href="#" class="text-blue-600 hover:underline">Terms</a> · 
+    <a href="#" class="text-blue-600 hover:underline">Support</a>
+  </p>
+</footer>
+
+
+</body>
+</html>
